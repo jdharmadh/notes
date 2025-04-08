@@ -12,7 +12,7 @@
 - The Current Privilege Level (CPL) is stored by x86 in the FLAGS register
 
 ### Interrupts
-- "Interrupt vector" where each interrupt is assigned a number
+- "Interrupt vector" where each interrupt number maps to a function
 	- 0 is division by zero
 	- 6 is a bad instruction
 - There is a special hardware register (called IDTR on x86) that will signal when there is a hardware interrupt
