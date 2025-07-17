@@ -1,0 +1,43 @@
+- The view server keeps a watch (via pings) over all servers, even idle ones just in case it has to promote an idle server to backup
+- Just for review, when a primary fails:
+	- The view server promotes a backup to primary
+	- The view server promotes an idle server to backup
+	- The view server pings all servers with the new view
+	- The new primary shares its state with the new backup
+	- The view server starts serving the new view to clients
+- Possible problems with this model: What if....
+	- The old primary is still running?
+	- Client contacts new primary before state transfer complete
+	- Client / primary / backup doesn't get the new view
+### Fixing Some Problems
+- We can't guarantee that all servers get the view simultaneously
+- Instead, guarantee that:
+	- For a given view, there is only one primary
+	- Operations will only be executed against the current view
+- If old primary still alive:
+	- "Split brain" happens
+	- If old primary has received view, it can forward requests to the new view
+	- When forwarding, the old primary will also send what it thinks the view is, and the new primary will reject if their views don't match
+	- This process needs to happen even for reads!
+	- Rule 3
+- If client requests before state transfer complete
+	- Need to do the state transfer quickly so new primary doesn't crash and you lose the whole state
+	- Need to do the state transfer atomically so updates in the primary during the state transfer can be processed by the backup without a race condition
+	- Rule 4
+- Client doesn’t get the new view?
+	- Rule 5: Non-primary must reject client requests
+- New primary dies before state transfer complete?
+	- For the labs, we will implement this policy: View server cannot change views until it knows current primary has finished state transfer
+	- This can't tolerate primary or backup failure during state transfer, but is simple and makes it easy to garbage collect old views
+	- Rule 6: View server cannot change views until current primary has acked the view
+### Properties of Primary Backup
+- **No single node's failure** can impede the system
+	- If view server fails, client can send ops to primary, get replies 
+	- If primary fails, view server can establish new view with backup as new primary
+	- If backup fails, view server can establish new view without backup
+	- If client fails, other clients can continue to send ops to primary
+- **Safe**: Key-value store operations appear to clients as if they happen in some serial order, regardless of failures
+- **Live**: The client will eventually get an answer as long as:
+	- The network is working and messages are delivered in a timely manner
+	- the view server has established a view
+	- at most one of (view server, primary, or backup) has failed
